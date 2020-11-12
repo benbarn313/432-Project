@@ -44,18 +44,16 @@ def pretty_colors(how_many):
         final_colours.append(color_rgb(tuple(temp_c)[0],tuple(temp_c)[1],tuple(temp_c)[2]))
     return final_colours
 
+#Insertion sort, from https://www.geeksforgeeks.org/insertion-sort/
+#Sorts by X value (S[i][0]), with Y value as tiebreaker (S[i][1]).
 def sort(S):
-    #S1 = np.zeros(len(S),2)
-    for i in range(1,len(S)):
-        j = i
-        while S[j][0] < S[j-1][0] or (S[j][0] == S[j-1][0] and S[j][1] < S[j-1][1]):
-            temp = S[j][0]
-            S[j][0] = S[j-1][0]
-            S[j-1][0] = temp
+    for i in range(1, len(S)):
+        key = S[i]
+        j = i - 1
+        while j >= 0 and (key[0] < S[j][0] or (key[0] == S[j][0] and key[1] < S[j][1])):
+            S[j+1] = S[j]
             j -= 1
-            if j == 0:
-                break
-    return S
+        S[j+1] = key
 
 def NNTrans_min():
     #TODO maybe?
@@ -143,10 +141,12 @@ if __name__ == "__main__":
     #starting coords and sort them if the need it
     #We could add a check to make sure the pixels fit in our grid size (defined above), but this is just a POC so it'll be fine
 
-    #TODO: THIS NEEDS FIXING, make sure that if x is the same then it is sorted by its y
-    #coords = [[1,1],[2,1],[5,3],[4,7],[7,6],[4,6],[9,4]]
-    #print(coords)
-    #print(sort(coords))
+    coords = [[1,1],[2,1],[5,3],[4,7],[7,6],[4,6],[9,4]]
+    print("Coords: (orig)")
+    print(coords)
+    print("Coords: (sorted)")
+    sort(coords)
+    print(coords)
 
     #Already sorted coords
     coords = [[1,1],[2,1],[4,6],[4,7],[5,3],[7,6],[9,4]]
@@ -177,4 +177,3 @@ if __name__ == "__main__":
             drawLinesMethod(linesY)
 
     print("Breakpoint here for now to stop the window from closing")
-        
