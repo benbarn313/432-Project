@@ -10,8 +10,8 @@ from colorsys import hsv_to_rgb
 from graphics import *
 import numpy as np
 
-gridWidth = 10
-gridHeight = 10
+gridWidth = 5
+gridHeight = 7
 
 #The origin is in the top-left, but I'm going to manipulate it so that doesn't matter
 scale = 50
@@ -20,7 +20,7 @@ imageHeight = gridHeight*scale
 
 
 drawBefore = True
-drawLines = True
+drawLines = False
 #More draws to be added later
 
 
@@ -55,35 +55,83 @@ def sort(S):
             j -= 1
         S[j+1] = key
 
-def NNTrans_min():
-    #TODO maybe?
-    return
 
-def NNTrans_max():
-    #TODO
-    return
+def NNTrans_max(p, Y):
+    return generateLines(p, Y)
+
+#For parallel lines only take the one with the highest intercept
+#O(2n) time, could make it O(n), but eh don't want to
+def removeDuplicateSlopes(lines):
+    i = 0
+    deletes = []
+    #Runs in O(n) time
+    while i < len(lines):
+        j = i+1
+        largest = lines[i]
+        while j < len(lines):
+            if lines[i][0] == lines[j][0]:
+                if lines[j][1]>lines[i][1]:
+                    deletes.append(i)
+                else:
+                    deletes.append(j)
+                j += 1
+            else:
+                break
+        i=j
+
+    #Probably could do this in the last loop, but python's dynamic arrays can be weird on deletes
+    #Again O(n) time
+    for k in reversed(deletes):
+        lines.pop(k)
+
+    return lines
 
 def generateLines(p, Y):
     #A line is defined as a two-tuple, (m,b), where m is the slope and b is the y-intercept
     #slope is 2x_i and intercept is 2y_i*Y - x_i^2 - y_i^2.
     #Y is our current row we are checking
-    #TODO, creates input for DUE_Y
+    i=1
     linesY = []
     for pix in p:
         x = pix.x
         y = pix.y
         m = 2*x
         b = 2*y*Y - (x*x) - (y*y)
-        linesY.append((m,b))
+        #The third element may not be necessary, but it keeps the lines with memory
+        linesY.append((m,b,i))
+        i += 1
 
-    return linesY
+    return removeDuplicateSlopes(linesY)
 
-def DUE_Y(lines):
-    upperTuplesArray = []
-    for line in lines:
-        break
+###-------------Discrete Upper Envelope Algorithms-------------###
+#Not sure if implementing them all is necessary. We'll see
+
+#O(U) degree 3
+#I think I need to implement Orientation and not Intersect, but I do not understand orientation
+def D3_DUE():
+    def Intersect(l, h):
+        x = (h[1]-l[1])/(l[0]-h[0])
+        y = (l[0]*h[1]-l[1]*h[0])/(l[0]-h[0])
+        return (x, y)
+    def Orientation(a, b, c):
+        #TODO
+        pass
     #TODO
-    return upperTuplesArray
+    pass
+
+#O(UlogU) degree 2
+def UlgU_DUE():
+    def IntersectCol(l, h):
+        x = (h[1] - l[1]) / (l[0] - h[0])
+        #y = (l[0] * h[1] - l[1] * h[0]) / (l[0] - h[0])
+        return x
+    #TODO
+    pass
+
+#O(U) degree 2, slower average time than D3_DUE
+def U_DUE():
+    #TODO
+    pass
 
 ###-------------VISUALIZING METHODS---------------###
 gridLineColor = 'gray50'
@@ -119,15 +167,16 @@ def drawBeforeMethod(p):
         pixelRectangle.draw(win)
 
 
+#Currently do not know how to make this work, asking the author
 def drawLinesMethod(linesY):
-    i = 0
+
     for line in linesY:
         m = line[0]
         b = line[1]
-        color = pixels[i].color
-        i += 1
-        start = Point(0, (gridHeight-b)*scale)
-        end = Point(imageWidth, ((gridHeight-b)*scale)+m*gridWidth)
+        color = pixels[line[3]].color
+
+        start = Point(0, ((gridHeight-b)*scale))
+        end = Point(imageWidth, (((gridHeight-b)*scale)+m*gridWidth))
         l = Line(start, end)
         l.setOutline(color)
         l.setWidth(scale/10)
@@ -142,14 +191,14 @@ if __name__ == "__main__":
     #We could add a check to make sure the pixels fit in our grid size (defined above), but this is just a POC so it'll be fine
 
     coords = [[1,1],[2,1],[5,3],[4,7],[7,6],[4,6],[9,4]]
-    print("Coords: (orig)")
-    print(coords)
-    print("Coords: (sorted)")
+    #print("Coords: (orig)")
+    #print(coords)
+    #print("Coords: (sorted)")
     sort(coords)
-    print(coords)
+    #print(coords)
 
     #Already sorted coords
-    coords = [[1,1],[2,1],[4,6],[4,7],[5,3],[7,6],[9,4]]
+    #coords = [[1,7],[2,4],[3,7],[4,5]]
 
     #Generate random colors (size of coords)
     colors = pretty_colors(len(coords))
@@ -167,7 +216,7 @@ if __name__ == "__main__":
 
 
 
-    for row in reversed(range(gridHeight)):
+    for row in reversed(range(1,gridHeight+1)):
         linesY = generateLines(pixels, row)
         print(linesY)
 
@@ -177,3 +226,6 @@ if __name__ == "__main__":
             drawLinesMethod(linesY)
 
     print("Breakpoint here for now to stop the window from closing")
+
+    for i in range(1,6):
+        print("s1: " + (str)(2*i+48) + " s2: " + (str)(4*i+36) + " s3 : " + (str)(6*i+40) + " s4: " + (str)(8*i+29))
