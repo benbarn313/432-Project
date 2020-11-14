@@ -111,19 +111,140 @@ def generateLines(p, Y):
 
 
 # ##-------------Discrete Upper Envelope Algorithms-------------###
-# Not sure if implementing them all is necessary. We'll see
 
 # O(U) degree 3
-# I think I need to implement Orientation and not Intersect, but I do not understand orientation
-def D3_DUE():
-    def Orientation(a, b, c):
-        # TODO
-        pass
-
-    # TODO
-    pass
+# This takes the set of lines of form y = mx + b and creates a set of points (m, -b), then finds
+# the convex hull of that set, then finds the lower hull from that. The lower point is equivalent
+# to the DUE.
 
 
+def D3_DUE(lines):
+
+    ## #-----------DEFINITIONS-----------# ##
+    
+    # orientation takes the determinant of a 3x3 matrix whose left column is all 1s,
+    # whose middle column is ax, bx, cx, and whose right column is ay, by, cy.
+    # Return changes depending on position of c in relation to directed line from a to b:
+    # If c is to the right, returns positive.
+    # If c to the left, returns negative.
+    # If c is colinear, returns 0.
+    def orientation(a, b, c):
+        ax = a[0]
+        ay = a[1]
+        bx = b[0]
+        by = b[1]
+        cx = c[0]
+        cy = c[1]
+        return (by-ay)*(cx-bx)-(bx-ax)*(cy-by)
+    
+    # From https://runestone.academy/runestone/books/published/pythonds/BasicDS/ImplementingaDequeinPython.html
+    class Deque:
+        def __init__(self):
+            self.items = []
+        def isEmpty(self):
+            return self.items == []
+        def addFront(self, item):
+            self.items.append(item)
+        def addRear(self, item):
+            self.items.insert(0,item)
+        def removeFront(self):
+            return self.items.pop()
+        def removeRear(self):
+            return self.items.pop(0)
+        def size(self):
+            return len(self.items)
+        # I added these methods; peekFront2() returns the item below the top,
+        # and peekBottom2 returns the item above the bottom.
+        def peekFront(self):
+            return self.items[len(self.items)-1]
+        def peekRear(self):
+            return self.items[0]
+        def peekFront2(self):
+            return self.items[len(self.items)-2]
+        def peekRear2(self):
+            return self.items[1]
+
+    # This sorts a list of 2-tuples by their first entry, and is used here to sort the points
+    # generated from the list of lines by their slopes (which are now the x coordinates).
+    def sortBySlope(points):
+        for i in range(1, len(points)):
+            key = points[i]
+            j = i - 1
+            while j >= 0 and key[0] < points[j][0]:
+                points[j + 1] = points[j]
+                j -= 1
+            points[j + 1] = key
+
+    # This formats the lines from the form (m, b, id) to ((m, b), id)
+    # Because I messed up the formatting and don't want to go through and redo all of it
+    def formatLines(lines):
+        newLines = []
+        for line in lines:
+            newLines.append([(line[0], -1*line[1]), line[2]])
+        return newLines
+
+    # Finds the convex hull of a set of points (the polygon with the fewest vertices where all points in the set are within the polygon)       
+    def convexHull(points):
+        #is the list of points enough to make a polygon?
+        if (len(points) < 3):
+            return points
+        deque = Deque()
+        #is the third point to the left of the line from the first to the second?
+        if (orientation(points[0][0], points[1][0], points[2][0]) > 0):
+            #left
+            deque.addFront(points[0])
+            deque.addFront(points[1])
+        else:
+            #right
+            deque.addFront(points[1])
+            deque.addFront(points[0])
+        deque.addFront(points[2])
+        deque.addRear(points[2])
+        
+        for i in range(2, len(points)):
+            if ((orientation(points[i][0], deque.peekRear()[0], deque.peekRear2()[0]) < 0) or (orientation(deque.peekFront2()[0], deque.peekFront()[0], points[i][0]) < 0)):
+                while orientation(deque.peekFront2()[0], deque.peekFront()[0], points[i][0]) <= 0:
+                    deque.removeFront()
+                deque.addFront(points[i])
+                while orientation(points[i][0], deque.peekRear()[0], deque.peekRear2()[0]) <= 0:
+                    deque.removeRear()
+                deque.addRear(points[i])        
+        
+        hull = []
+        while (not deque.isEmpty()):
+            hull.append(deque.removeRear())
+        hull.pop() #due to how hull is constructed, the first and last elements will be duplicates.
+        return hull
+
+    # Finds the lower hull of a convex hull (all points in the hull lower than the line from the left extreme to the right extreme)
+    def lowerConvexHull(hull):
+        lowerHull = []
+        leftmost = ((float('inf'), None), None)
+        rightmost = ((float('-inf'), None), None)
+        for point in hull:
+            if point[0][0] < leftmost[0][0] or (point[0][0] == leftmost[0][0] and point[0][1] < leftmost[0][1]):
+                leftmost = point
+            if point[0][0] > rightmost[0][0] or (point[0][0] == rightmost[0][0] and point[0][1] < rightmost[0][1]):
+                rightmost = point
+        for point in hull:
+            if orientation(leftmost[0], rightmost[0], point[0]) >= 0:
+                lowerHull.append(point)
+        return lowerHull
+
+    ## #-----------IMPLEMENTATION-----------# ##
+    lines = formatLines(lines)
+    sortBySlope(lines)
+    print("Lines:", lines)
+    hull = convexHull(lines)
+    print("hull", hull)
+    lowerHull = lowerConvexHull(hull)
+    return lowerHull
+
+    #TODO: this needs to return in the same format as UlgU_DUE.
+    #TODO: don't know how to transition from this format to UglU's.
+    #TODO: this seems to work in the way described by the paper, but output is not identical to UglU's.
+
+    
 # O(UlogU) degree 2
 def UlgU_DUE(lines):
     def IntersectCol(l, h):
@@ -134,10 +255,7 @@ def UlgU_DUE(lines):
     def Above(l, h, x):
         a = l[0] * x + l[1]
         b = h[0] * x + h[1]
-        if a > b:
-            return True
-        else:
-            return False
+        return a > b
 
     computedTuples = []
 
@@ -154,23 +272,15 @@ def UlgU_DUE(lines):
         currentIntersect = gridWidth
         newTop = None
         for line in lines[currentTop:]:
-            interesection = IntersectCol(lines[currentTop - 1], line)
-            if interesection <= gridWidth and interesection <= currentIntersect:
-                currentIntersect = interesection
+            intersection = IntersectCol(lines[currentTop - 1], line)
+            if intersection <= gridWidth and intersection <= currentIntersect:
+                currentIntersect = intersection
                 newTop = line[2]
         computedTuples.append((currentTop, startingIntersect, currentIntersect))
         currentTop = newTop
         startingIntersect = currentIntersect
 
     return computedTuples
-
-
-# O(U) degree 2, slower average time than D3_DUE
-# Too complicated to implement in a timely manner
-def U_DUE():
-    #
-    pass
-
 
 # ##-------------VISUALIZING METHODS---------------###
 gridLineColor = 'gray50'
@@ -270,12 +380,29 @@ if __name__ == "__main__":
     if (drawBefore):
         drawBeforeMethod(pixels);
     print()
-    # For UlgU_DUE, can just duplicate this for method for D3_DUE and change the second method call
+
+    #D3_DUE--------------------
+##    for row in reversed(range(1, gridHeight + 1)):
+##        linesY = generateLines(pixels, row)
+##        print(linesY)
+##        due = D3_DUE(linesY)
+##        print(due)
+##        if (drawLines):
+##            clear()
+##            drawGridMethod()
+##            drawLinesMethod(linesY)
+##
+##        # This breaks if drawLines is true, but I'm not going to bother implementing it
+##        if drawNonSites:
+##            drawNonSitesMethod(due, row)
+            
+    #UlgU_DUE------------------
     for row in reversed(range(1, gridHeight + 1)):
         linesY = generateLines(pixels, row)
         print(linesY)
         due = UlgU_DUE(linesY)
-        print(due)
+        print(due)     
+        print()
         if (drawLines):
             clear()
             drawGridMethod()
