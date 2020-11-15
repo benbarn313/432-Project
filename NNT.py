@@ -109,6 +109,11 @@ def generateLines(p, Y):
 
     return removeDuplicateSlopes(linesY)
 
+def intersectCol(l, h):
+    x = (h[1] - l[1]) / (l[0] - h[0])
+    # y = (l[0] * h[1] - l[1] * h[0]) / (l[0] - h[0])
+    return x
+
 
 # ##-------------Discrete Upper Envelope Algorithms-------------###
 
@@ -164,6 +169,14 @@ def D3_DUE(lines):
         def peekRear2(self):
             return self.items[1]
 
+    # This formats the lines from the form (m, b, id) to ((m, -b), id)
+    # Because I messed up the formatting and don't want to go through and redo all of it
+    def formatLines(lines):
+        newLines = []
+        for line in lines:
+            newLines.append([(line[0], -1*line[1]), line[2]])
+        return newLines
+    
     # This sorts a list of 2-tuples by their first entry, and is used here to sort the points
     # generated from the list of lines by their slopes (which are now the x coordinates).
     def sortBySlope(points):
@@ -175,15 +188,9 @@ def D3_DUE(lines):
                 j -= 1
             points[j + 1] = key
 
-    # This formats the lines from the form (m, b, id) to ((m, b), id)
-    # Because I messed up the formatting and don't want to go through and redo all of it
-    def formatLines(lines):
-        newLines = []
-        for line in lines:
-            newLines.append([(line[0], -1*line[1]), line[2]])
-        return newLines
-
-    # Finds the convex hull of a set of points (the polygon with the fewest vertices where all points in the set are within the polygon)       
+    # Finds the convex hull of a set of points (the polygon with the fewest vertices
+    # where all points in the set are within the polygon and the polygon's vertices
+    # are within the set)       
     def convexHull(points):
         #is the list of points enough to make a polygon?
         if (len(points) < 3):
@@ -202,7 +209,8 @@ def D3_DUE(lines):
         deque.addRear(points[2])
         
         for i in range(2, len(points)):
-            if ((orientation(points[i][0], deque.peekRear()[0], deque.peekRear2()[0]) < 0) or (orientation(deque.peekFront2()[0], deque.peekFront()[0], points[i][0]) < 0)):
+            if ((orientation(points[i][0], deque.peekRear()[0], deque.peekRear2()[0]) < 0) or
+                (orientation(deque.peekFront2()[0], deque.peekFront()[0], points[i][0]) < 0)):
                 while orientation(deque.peekFront2()[0], deque.peekFront()[0], points[i][0]) <= 0:
                     deque.removeFront()
                 deque.addFront(points[i])
@@ -231,27 +239,59 @@ def D3_DUE(lines):
                 lowerHull.append(point)
         return lowerHull
 
+    #undoes transformation from lines to points
+    #lists lines in the upper envelope
+    def formatLowerHull(hull):
+        lines = []
+        for point in hull:
+            lines.append([(point[0][0], -1*point[0][1]), point[1]])
+        return lines
+
+    def sortIntersectsBySiteID(intersects):
+        for i in range(1, len(intersects)):
+            key = intersects[i]
+            j = i - 1
+            while j >= 0 and key[1] < intersects[j][1]:
+                intersects[j + 1] = intersects[j]
+                j -= 1
+            intersects[j + 1] = key
+        
     ## #-----------IMPLEMENTATION-----------# ##
     lines = formatLines(lines)
     sortBySlope(lines)
-    print("Lines:", lines)
     hull = convexHull(lines)
-    print("hull", hull)
     lowerHull = lowerConvexHull(hull)
-    return lowerHull
 
-    #TODO: this needs to return in the same format as UlgU_DUE.
-    #TODO: don't know how to transition from this format to UglU's.
-    #TODO: this seems to work in the way described by the paper, but output is not identical to UglU's.
+    #Now that we have the lower hull, we convert these points back to lines.
+    upperEnvelope = formatLowerHull(lowerHull)
+    #Then find the intersects of these lines, and which sites are to the left and right of these intersects.
+    intersects = []
+    for i in range(len(upperEnvelope)-1):
+        intersects.append((intersectCol(upperEnvelope[i][0], upperEnvelope[i+1][0]), upperEnvelope[i+1][1], upperEnvelope[i][1]))
 
+    #Then create a list of tuples which contain the id of the nearest site, the left bound, and the right bound.
+    tuples = []
+    sortIntersectsBySiteID(intersects)
+
+    leftBound = 1
+    if (intersects[0][0] > 1):
+        tuples.append((intersects[0][1], 1, intersects[0][0]))
+        leftBound = 2
+        
+    for i in range(len(intersects)-1):
+        if (intersects[i+1][0] > 1):
+            tuples.append((intersects[i][2], leftBound, intersects[i+1][0]))
+            leftBound = intersects[i+1][0]
+        else:
+            continue
+        
+    tuples.append((intersects[len(intersects)-1][2], leftBound, gridWidth))
+    
+    return tuples
+    
     
 # O(UlogU) degree 2
 def UlgU_DUE(lines):
-    def IntersectCol(l, h):
-        x = (h[1] - l[1]) / (l[0] - h[0])
-        # y = (l[0] * h[1] - l[1] * h[0]) / (l[0] - h[0])
-        return x
-
     def Above(l, h, x):
         a = l[0] * x + l[1]
         b = h[0] * x + h[1]
@@ -272,7 +312,7 @@ def UlgU_DUE(lines):
         currentIntersect = gridWidth
         newTop = None
         for line in lines[currentTop:]:
-            intersection = IntersectCol(lines[currentTop - 1], line)
+            intersection = intersectCol(lines[currentTop - 1], line)
             if intersection <= gridWidth and intersection <= currentIntersect:
                 currentIntersect = intersection
                 newTop = line[2]
@@ -356,18 +396,15 @@ if __name__ == "__main__":
     # starting coords and sort them if the need it
     # We could add a check to make sure the pixels fit in our grid size (defined above), but this is just a POC so it'll be fine
 
-    coords = [[1, 1], [2, 1], [5, 3], [4, 7], [7, 6], [4, 6], [9, 4]]
-    # print("Coords: (orig)")
-    # print(coords)
-    # print("Coords: (sorted)")
-    sort(coords)
-    # print(coords)
-
+    #coords = [[1, 1], [2, 1], [5, 3], [4, 7], [7, 6], [4, 6], [9, 4]]
+    #sort(coords)
+    
     # Already sorted coords
-    coords = [[1, 7], [2, 4], [3, 7], [4, 5]]
+    coords = [[1, 7], [2, 4], [3, 7], [4, 5], [8, 2]]
 
     # Generate random colors (size of coords)
     colors = pretty_colors(len(coords))
+    
 
     # Make each pixel with a color
     pixels = []
@@ -379,30 +416,11 @@ if __name__ == "__main__":
     drawGridMethod()
     if (drawBefore):
         drawBeforeMethod(pixels);
-    print()
 
     #D3_DUE--------------------
-##    for row in reversed(range(1, gridHeight + 1)):
-##        linesY = generateLines(pixels, row)
-##        print(linesY)
-##        due = D3_DUE(linesY)
-##        print(due)
-##        if (drawLines):
-##            clear()
-##            drawGridMethod()
-##            drawLinesMethod(linesY)
-##
-##        # This breaks if drawLines is true, but I'm not going to bother implementing it
-##        if drawNonSites:
-##            drawNonSitesMethod(due, row)
-            
-    #UlgU_DUE------------------
     for row in reversed(range(1, gridHeight + 1)):
         linesY = generateLines(pixels, row)
-        print(linesY)
-        due = UlgU_DUE(linesY)
-        print(due)     
-        print()
+        due = D3_DUE(linesY)
         if (drawLines):
             clear()
             drawGridMethod()
@@ -411,6 +429,22 @@ if __name__ == "__main__":
         # This breaks if drawLines is true, but I'm not going to bother implementing it
         if drawNonSites:
             drawNonSitesMethod(due, row)
+            
+            
+##    #UlgU_DUE------------------
+##    for row in reversed(range(1, gridHeight + 1)):
+##        linesY = generateLines(pixels, row)
+##        print(linesY)
+##        due = UlgU_DUE(linesY)
+##        print(due)     
+##        if (drawLines):
+##            clear()
+##            drawGridMethod()
+##            drawLinesMethod(linesY)
+##
+##        # This breaks if drawLines is true, but I'm not going to bother implementing it
+##        if drawNonSites:
+##            drawNonSitesMethod(due, row)
 
     print("Breakpoint here for now to stop the window from closing")
 
