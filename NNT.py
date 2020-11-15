@@ -119,8 +119,9 @@ def intersectCol(l, h):
 
 # O(U) degree 3
 # This takes the set of lines of form y = mx + b and creates a set of points (m, -b), then finds
-# the convex hull of that set, then finds the lower hull from that. The lower point is equivalent
-# to the DUE.
+# the convex hull of that set, then finds the lower hull of that. Then transforms the points in
+# the lower hull back into lines, then finds the intersects of those lines and which sites
+# correspond to which sides of those intersects.
 
 
 def D3_DUE(lines):
@@ -170,23 +171,11 @@ def D3_DUE(lines):
             return self.items[1]
 
     # This formats the lines from the form (m, b, id) to ((m, -b), id)
-    # Because I messed up the formatting and don't want to go through and redo all of it
     def formatLines(lines):
         newLines = []
         for line in lines:
             newLines.append([(line[0], -1*line[1]), line[2]])
         return newLines
-    
-    # This sorts a list of 2-tuples by their first entry, and is used here to sort the points
-    # generated from the list of lines by their slopes (which are now the x coordinates).
-    def sortBySlope(points):
-        for i in range(1, len(points)):
-            key = points[i]
-            j = i - 1
-            while j >= 0 and key[0] < points[j][0]:
-                points[j + 1] = points[j]
-                j -= 1
-            points[j + 1] = key
 
     # Finds the convex hull of a set of points (the polygon with the fewest vertices
     # where all points in the set are within the polygon and the polygon's vertices
@@ -207,7 +196,8 @@ def D3_DUE(lines):
             deque.addFront(points[0])
         deque.addFront(points[2])
         deque.addRear(points[2])
-        
+
+        #traverse the rest of the points, adding them to the deque if they are part of the hull
         for i in range(2, len(points)):
             if ((orientation(points[i][0], deque.peekRear()[0], deque.peekRear2()[0]) < 0) or
                 (orientation(deque.peekFront2()[0], deque.peekFront()[0], points[i][0]) < 0)):
@@ -219,6 +209,7 @@ def D3_DUE(lines):
                 deque.addRear(points[i])        
         
         hull = []
+        # format the deque into an array
         while (not deque.isEmpty()):
             hull.append(deque.removeRear())
         hull.pop() #due to how hull is constructed, the first and last elements will be duplicates.
@@ -258,12 +249,12 @@ def D3_DUE(lines):
         
     ## #-----------IMPLEMENTATION-----------# ##
     lines = formatLines(lines)
-    sortBySlope(lines)
     hull = convexHull(lines)
     lowerHull = lowerConvexHull(hull)
 
     #Now that we have the lower hull, we convert these points back to lines.
     upperEnvelope = formatLowerHull(lowerHull)
+    
     #Then find the intersects of these lines, and which sites are to the left and right of these intersects.
     intersects = []
     for i in range(len(upperEnvelope)-1):
@@ -282,8 +273,6 @@ def D3_DUE(lines):
         if (intersects[i+1][0] > 1):
             tuples.append((intersects[i][2], leftBound, intersects[i+1][0]))
             leftBound = intersects[i+1][0]
-        else:
-            continue
         
     tuples.append((intersects[len(intersects)-1][2], leftBound, gridWidth))
     
